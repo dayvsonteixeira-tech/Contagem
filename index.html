@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contagem de Estoque — Lançamento</title>
+<style>
+  :root{
+    --bg: #fffafa;             /* branco neve */
+    --panel: #ffffff;
+    --panel-2: #f6f6f4;
+    --line: #e4e2dc;
+    --ink: #232323;
+    --ink-dim: #7a7a76;
+    --accent: #e8792f;
+    --accent-ink: #ffffff;
+    --accent-2: #1e8f5f;
+    --red: #c0392b;
+    --red-soft: #fbeae7;
+    --green: #2e7d4f;
+    --green-soft: #e8f5ee;
+    --finalized: #1e8f5f;
+    --finalized-soft: #e5f6ed;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --shadow: 0 1px 3px rgba(20,20,20,0.05), 0 1px 2px rgba(20,20,20,0.04);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--bg);
+    color:var(--ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height:100vh;
+  }
+  header{
+    padding: 24px 32px 16px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+  }
+  .brand .tag{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:2px;
+    color:var(--accent);
+    background:rgba(232,121,47,0.09);
+    border:1px solid rgba(232,121,47,0.3);
+    padding:3px 8px;
+    border-radius:4px;
+    text-transform:uppercase;
+  }
+  h1{
+    margin:6px 0 2px;
+    font-size:24px;
+    font-weight:700;
+    letter-spacing:-0.3px;
+    color:var(--ink);
+  }
+  .subtitle{ color:var(--ink-dim); font-size:13px; }
+
+  /* ===== KPIs ===== */
+  .kpis{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .kpi{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:10px 16px;
+    min-width:110px;
+    box-shadow: var(--shadow);
+    text-align:center;
+  }
+  .kpi .kpi-value{
+    font-family:var(--mono);
+    font-size:20px;
+    font-weight:700;
+    color:var(--ink);
+    line-height:1.1;
+  }
+  .kpi .kpi-label{
+    font-size:10.5px;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    color:var(--ink-dim);
+    margin-top:2px;
+  }
+  .kpi.finalized .kpi-value{ color:var(--finalized); }
+  .kpi.critical .kpi-value{ color:var(--red); }
+
+  /* ===== Formulário de lançamento ===== */
+  .entry-panel{
+    margin:22px 32px 0;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .entry-panel h2{
+    margin:0 0 4px;
+    font-size:15px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:var(--ink);
+  }
+  .entry-panel h2 .n{
+    font-family:var(--mono);
+    font-size:11px;
+    color:#fff;
+    background:var(--accent);
+    border-radius:5px;
+    padding:2px 6px;
+  }
+  .entry-hint{ color:var(--ink-dim); font-size:12px; margin-bottom:16px; }
+
+  .entry-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap:12px;
+    align-items:end;
+  }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field.wide{ grid-column: span 2; }
+  .field label{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.6px;
+    text-transform:uppercase;
+    color:#1a1a1a;
+    font-weight:700;
+  }
+  .field input, .field select, .field textarea{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--ink);
+    padding:9px 10px;
+    border-radius:7px;
+    font-size:13.5px;
+    outline:none;
+    font-family: inherit;
+    width:100%;
+  }
+  .field textarea{ resize:vertical; min-height:38px; }
+  .field input:focus, .field select:focus, .field textarea:focus{ border-color:var(--accent); background:#fff; }
+  .field.part input{ font-family:var(--mono); font-weight:600; text-transform:uppercase; }
+
+  .status-toggle{ display:flex; gap:6px; }
+  .status-btn{
+    flex:1;
+    padding:9px 8px;
+    border-radius:7px;
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    color:var(--ink-dim);
+    font-family:var(--mono);
+    font-size:11px;
+    cursor:pointer;
+    text-align:center;
+    transition:.15s;
+  }
+  .status-btn[data-v="green"].active{ background:var(--green-soft); border-color:var(--green); color:var(--green); }
+  .status-btn[data-v="red"].active{ background:var(--red-soft); border-color:var(--red); color:var(--red); }
+  .status-btn[data-v="plain"].active{ background:var(--green-soft); border-color:var(--green); color:var(--green); }
+
+  .entry-actions{
+    margin-top:16px;
+    display:flex;
+    gap:10px;
+    justify-content:flex-end;
+    align-items:center;
+  }
+  button.primary{
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    font-weight:700;
+    font-size:13.5px;
+    padding:11px 22px;
+    border-radius:8px;
+    cursor:pointer;
+    transition:filter .15s;
+  }
+  button.primary:hover{ filter:brightness(1.06); }
+  button.ghost{
+    background:transparent;
+    color:var(--ink-dim);
+    border:1px solid var(--line);
+    font-size:13px;
+    padding:11px 18px;
+    border-radius:8px;
+    cursor:pointer;
+  }
+  button.ghost:hover{ color:var(--ink); border-color:#c8c6c0; background:var(--panel-2); }
+
+  /* ===== Toolbar da tabela ===== */
+  .toolbar{
+    padding:16px 32px;
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .search{ flex:1; min-width:220px; position:relative; }
+  .search input{
+    width:100%;
+    background:var(--panel);
+    border:1px solid var(--line);
+    color:var(--ink);
+    padding:10px 14px 10px 34px;
+    border-radius:8px;
+    font-size:14px;
+    outline:none;
+  }
+  .search input:focus{ border-color:var(--accent); }
+  .search::before{
+    content:"⌕";
+    position:absolute; left:12px; top:50%;
+    transform:translateY(-50%);
+    color:var(--ink-dim); font-size:16px;
+  }
+  .chip{
+    font-family:var(--mono);
+    font-size:12px;
+    padding:8px 12px;
+    border-radius:7px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--ink-dim);
+    cursor:pointer;
+    user-select:none;
+    white-space:nowrap;
+  }
+  .chip:hover{ color:var(--ink); border-color:#c8c6c0; }
+  .chip.active{ color:#fff; background:var(--accent); border-color:var(--accent); font-weight:600; }
+  .chip .dot{ display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; }
+  .chip.red .dot{ background:var(--red); }
+  .chip.green .dot{ background:var(--green); }
+  .chip.fin .dot{ background:var(--finalized); }
+
+  .table-wrap{ padding: 0 32px 40px; overflow-x:auto; }
+  table{ width:100%; border-collapse:collapse; margin-top:6px; font-size:13px; min-width:1420px; background:var(--panel); border-radius:10px; overflow:hidden; box-shadow: var(--shadow); }
+  thead th{
+    position:sticky; top:0;
+    background:#faf9f7;
+    color:var(--ink-dim);
+    text-transform:uppercase;
+    font-size:10.5px;
+    letter-spacing:0.7px;
+    padding:10px 12px;
+    text-align:left;
+    border-bottom:2px solid var(--line);
+    white-space:nowrap;
+  }
+  thead th.num, td.num{ text-align:right; }
+  tbody tr{ border-bottom:1px solid var(--line); transition:background .1s; }
+  tbody tr:hover{ background:#faf9f6; }
+  tbody tr.is-finalized-green{ background: var(--finalized-soft); }
+  tbody tr.is-finalized-green:hover{ background: #dcf1e5; }
+  tbody tr.is-finalized-red{ background: var(--red-soft); }
+  tbody tr.is-finalized-red:hover{ background: #f8dcd6; }
+  td{ padding:9px 12px; white-space:nowrap; color:var(--ink); }
+  td.dim{ color:var(--ink-dim); }
+  td.mono{ font-family:var(--mono); }
+  td.comment{ white-space:normal; max-width:200px; color:var(--ink-dim); font-size:12px; }
+
+  .part-cell{
+    display:inline-flex; align-items:center; gap:8px;
+    font-family:var(--mono); font-weight:600;
+    padding:4px 10px; border-radius:6px;
+  }
+  .part-red{ background:var(--red-soft); color:var(--red); border:1px solid rgba(192,57,43,0.3); }
+  .part-green{ background:var(--green-soft); color:var(--green); border:1px solid rgba(46,125,79,0.3); }
+  .part-plain{ font-family:var(--mono); font-weight:600; color:var(--ink); }
+
+  .row-actions{ display:flex; gap:6px; }
+  .icon-btn{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--ink-dim);
+    width:28px; height:28px;
+    border-radius:6px;
+    cursor:pointer;
+    font-size:13px;
+    line-height:1;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .icon-btn:hover{ color:var(--ink); border-color:#c8c6c0; }
+  .icon-btn.del:hover{ color:var(--red); border-color:var(--red); }
+  .icon-btn.fin{ color:var(--finalized); border-color:rgba(30,143,95,0.4); }
+  .icon-btn.fin.active-green{ background:var(--finalized); color:#fff; border-color:var(--finalized); }
+  .icon-btn.fin.active-red{ background:var(--red); color:#fff; border-color:var(--red); }
+  .icon-btn.fin:hover{ background:var(--finalized-soft); }
+  .icon-btn.fin.active-green:hover{ background:var(--finalized); filter:brightness(1.05); }
+  .icon-btn.fin.active-red:hover{ background:var(--red); filter:brightness(1.05); }
+
+  .empty-row{ text-align:center; color:var(--ink-dim); padding:36px; font-family:var(--mono); font-size:13px; }
+
+  footer{
+    padding:14px 32px 28px;
+    color:var(--ink-dim);
+    font-size:11.5px;
+    font-family:var(--mono);
+  }
+  .save-flash{
+    color: var(--accent-2);
+    opacity:0;
+    transition: opacity .3s;
+    font-size:12.5px;
+    font-family:var(--mono);
+  }
+  .save-flash.show{ opacity:1; }
+
+  @media (max-width:720px){
+    header, .entry-panel, .toolbar, .table-wrap, footer{ margin-left:16px; margin-right:16px; padding-left:16px; padding-right:16px; }
+    .entry-panel{ margin-left:16px; margin-right:16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="tag">Estoque · Contagem</span>
+    <h1>Lançamento de Contagem</h1>
+    <div class="subtitle">Digite o PartNumber e vá preenchendo os valores conforme for encontrando</div>
+  </div>
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-value" id="kpiTotal">0</div>
+      <div class="kpi-label">Total lançadas</div>
+    </div>
+    <div class="kpi finalized">
+      <div class="kpi-value" id="kpiFinalized">0</div>
+      <div class="kpi-label">SPOT</div>
+    </div>
+    <div class="kpi critical">
+      <div class="kpi-value" id="kpiCritical">0</div>
+      <div class="kpi-label">HOT</div>
+    </div>
+  </div>
+</header>
+
+<div class="entry-panel">
+  <h2><span class="n">+</span> Novo lançamento</h2>
+  <div class="entry-hint">Preencha só o que tiver em mãos agora — os campos vazios ficam como "—" e você pode editar a linha depois.</div>
+
+  <div class="entry-grid">
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="f_data">
+    </div>
+    <div class="field part">
+      <label>PartNumber *</label>
+      <input type="text" id="f_part" placeholder="Ex: 215445R83A" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>ON-HAND</label>
+      <input type="number" id="f_onhand" placeholder="—">
+    </div>
+    <div class="field">
+      <label>Qtd na Linha</label>
+      <input type="number" id="f_linha" placeholder="—">
+    </div>
+    <div class="field">
+      <label>Hora</label>
+      <input type="time" id="f_hora">
+    </div>
+    <div class="field">
+      <label>Serial</label>
+      <input type="text" id="f_serial" placeholder="—">
+    </div>
+    <div class="field">
+      <label>Qtd no Estoque</label>
+      <input type="number" id="f_estoque" placeholder="—">
+    </div>
+    <div class="field">
+      <label>Qtd no Recebimento</label>
+      <input type="number" id="f_receb" placeholder="—">
+    </div>
+    <div class="field">
+      <label>PCS (sistema)</label>
+      <input type="number" id="f_pcs" placeholder="—">
+    </div>
+    <div class="field">
+      <label>Picking</label>
+      <input type="number" id="f_picking" placeholder="—">
+    </div>
+    <div class="field">
+      <label>Total</label>
+      <input type="text" id="f_total" placeholder="0" readonly style="font-family:var(--mono); font-weight:700; color:var(--accent); background:#fdf1e8;">
+    </div>
+    <div class="field">
+      <label>Endereço de Estoque</label>
+      <input type="text" id="f_endEstoque" placeholder="Ex: 1CP0402A03">
+    </div>
+    <div class="field">
+      <label>Endereço de Linha</label>
+      <input type="text" id="f_end" placeholder="Ex: 1CBS42RA0">
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <div class="status-toggle">
+        <div class="status-btn" data-v="red">HOT</div>
+        <div class="status-btn active" data-v="plain">SPOT</div>
+      </div>
+    </div>
+    <div class="field wide">
+      <label>Comentário</label>
+      <textarea id="f_comment" placeholder="Alguma observação sobre essa contagem..."></textarea>
+    </div>
+  </div>
+
+  <div class="entry-actions">
+    <span class="save-flash" id="saveFlash">Salvo ✓</span>
+    <button class="ghost" id="clearBtn">Limpar campos</button>
+    <button class="primary" id="addBtn">Adicionar contagem</button>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="search">
+    <input type="text" id="searchInput" placeholder="Buscar por PartNumber, Serial ou Endereço...">
+  </div>
+  <div class="chip active" data-filter="all">Todos</div>
+  <div class="chip red" data-filter="red"><span class="dot"></span>HOT</div>
+  <div class="chip fin" data-filter="finalized"><span class="dot"></span>SPOT</div>
+  <button class="ghost" id="exportBtn">Exportar CSV</button>
+  <button class="ghost" id="resetBtn">Apagar tudo</button>
+</div>
+
+<div class="table-wrap">
+  <table id="dataTable">
+    <thead>
+      <tr>
+        <th></th>
+        <th>Data</th>
+        <th>PartNumber</th>
+        <th class="num">ON-HAND</th>
+        <th class="num">Qtd Linha</th>
+        <th>Hora</th>
+        <th class="num">Serial</th>
+        <th class="num">Qtd Estoque</th>
+        <th class="num">Qtd Receb.</th>
+        <th class="num">Total</th>
+        <th class="num">PCS</th>
+        <th>Picking</th>
+        <th>Status</th>
+        <th>Endereço de Estoque</th>
+        <th>Endereço de Linha</th>
+        <th>Comentário</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<footer>
+  Os lançamentos ficam salvos automaticamente neste navegador (localStorage) — feche e volte quando quiser, a contagem continua aqui. Clique no ✓ da linha para finalizar: fica verde se o status for SPOT, ou vermelho se for HOT.
+</footer>
+
+<script>
+  const STORAGE_KEY = 'contagem_estoque_v2';
+  const fmt = v => (v === null || v === undefined || v === "") ? "—" : (typeof v === "number" ? v.toLocaleString('pt-BR') : v);
+
+  function todayStr(){
+    const d = new Date();
+    return d.toLocaleDateString('pt-BR');
+  }
+
+  function loadRows(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) return JSON.parse(raw);
+    }catch(e){}
+    return [];
+  }
+
+  function saveRows(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
+      const flash = document.getElementById('saveFlash');
+      flash.classList.add('show');
+      setTimeout(()=> flash.classList.remove('show'), 900);
+    }catch(e){}
+  }
+
+  let rows = loadRows();
+  let currentFilter = 'all';
+  let searchTerm = '';
+
+  function todayISO(){
+    const d = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  function isoToBR(iso){
+    if(!iso) return todayStr();
+    const [y,m,d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  document.getElementById('f_data').value = todayISO();
+
+  function partCellHTML(r){
+    if(r.tipo === "red") return `<span class="part-cell part-red">${r.part}</span>`;
+    if(r.tipo === "green") return `<span class="part-cell part-green">${r.part}</span>`;
+    return `<span class="part-plain">${r.part}</span>`;
+  }
+  function statusLabel(t){
+    if(t === 'red') return `<span style="color:var(--red);font-family:var(--mono);font-size:11px;">HOT</span>`;
+    if(t === 'green') return `<span style="color:var(--green);font-family:var(--mono);font-size:11px;">EM LINHA</span>`;
+    return `<span style="color:var(--ink-dim);font-family:var(--mono);font-size:11px;">SPOT</span>`;
+  }
+
+  function computeTotal(r){
+    const vals = [r.linha, r.estoque, r.receb, r.picking].filter(v => typeof v === 'number');
+    if(vals.length === 0) return null;
+    return vals.reduce((a,b)=>a+b, 0);
+  }
+
+  const tbody = document.getElementById('tableBody');
+
+  function render(){
+    let data = rows.filter(r => {
+      if(currentFilter === 'finalized' && !r.finalizado) return false;
+      if(currentFilter !== 'all' && currentFilter !== 'finalized' && r.tipo !== currentFilter) return false;
+      if(searchTerm){
+        const hay = [r.part, r.serial, r.endEstoque, r.end, r.picking, r.comentario].join(' ').toLowerCase();
+        if(!hay.includes(searchTerm)) return false;
+      }
+      return true;
+    });
+
+    if(data.length === 0){
+      tbody.innerHTML = `<tr><td colspan="17" class="empty-row">Nenhum lançamento encontrado. Use o formulário acima para começar a contagem.</td></tr>`;
+    } else {
+      tbody.innerHTML = data.map(r => {
+        const finClass = r.finalizado ? (r.tipo === 'red' ? 'is-finalized-red' : 'is-finalized-green') : '';
+        const finBtnClass = r.finalizado ? (r.tipo === 'red' ? 'active-red' : 'active-green') : '';
+        return `
+        <tr data-id="${r.id}" class="${finClass}">
+          <td>
+            <button class="icon-btn fin ${finBtnClass}" title="${r.finalizado ? 'Reabrir contagem' : 'Marcar como finalizada'}" data-fin="${r.id}">✓</button>
+          </td>
+          <td class="dim">${fmt(r.data)}</td>
+          <td>${partCellHTML(r)}</td>
+          <td class="num mono">${fmt(r.onhand)}</td>
+          <td class="num mono">${fmt(r.linha)}</td>
+          <td class="mono dim">${fmt(r.hora)}</td>
+          <td class="num mono">${fmt(r.serial)}</td>
+          <td class="num mono">${fmt(r.estoque)}</td>
+          <td class="num mono">${fmt(r.receb)}</td>
+          <td class="num mono">${fmt(computeTotal(r))}</td>
+          <td class="num mono">${fmt(r.pcs)}</td>
+          <td class="mono dim">${fmt(r.picking)}</td>
+          <td>${statusLabel(r.tipo)}</td>
+          <td class="mono dim">${fmt(r.endEstoque)}</td>
+          <td class="mono dim">${fmt(r.end)}</td>
+          <td class="comment">${fmt(r.comentario)}</td>
+          <td>
+            <div class="row-actions">
+              <button class="icon-btn del" title="Excluir" data-del="${r.id}">✕</button>
+            </div>
+          </td>
+        </tr>
+      `;
+      }).join('');
+    }
+
+    document.getElementById('kpiTotal').textContent = rows.length;
+    document.getElementById('kpiFinalized').textContent = rows.filter(r=>r.finalizado).length;
+    document.getElementById('kpiCritical').textContent = rows.filter(r=>r.tipo==='red').length;
+
+    tbody.querySelectorAll('[data-del]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.dataset.del;
+        rows = rows.filter(r => String(r.id) !== String(id));
+        saveRows();
+        render();
+      });
+    });
+
+    tbody.querySelectorAll('[data-fin]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.dataset.fin;
+        const row = rows.find(r => String(r.id) === String(id));
+        if(row){
+          row.finalizado = !row.finalizado;
+          saveRows();
+          render();
+        }
+      });
+    });
+  }
+
+  // status toggle
+  let selectedStatus = 'plain';
+  document.querySelectorAll('.status-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedStatus = btn.dataset.v;
+    });
+  });
+
+  function numOrNull(v){
+    if(v === '' || v === null || v === undefined) return null;
+    const n = Number(v);
+    return isNaN(n) ? v : n;
+  }
+
+  function updateFormTotal(){
+    const vals = [
+      numOrNull(document.getElementById('f_linha').value),
+      numOrNull(document.getElementById('f_estoque').value),
+      numOrNull(document.getElementById('f_receb').value),
+      numOrNull(document.getElementById('f_picking').value),
+    ].filter(v => typeof v === 'number');
+    const total = vals.length ? vals.reduce((a,b)=>a+b,0) : 0;
+    document.getElementById('f_total').value = total.toLocaleString('pt-BR');
+  }
+  ['f_linha','f_estoque','f_receb','f_picking'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', updateFormTotal);
+  });
+
+  function clearForm(){
+    ['f_part','f_onhand','f_linha','f_hora','f_serial','f_estoque','f_receb','f_pcs','f_picking','f_endEstoque','f_end','f_comment'].forEach(id=>{
+      document.getElementById(id).value = '';
+    });
+    document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('.status-btn[data-v="plain"]').classList.add('active');
+    selectedStatus = 'plain';
+    document.getElementById('f_part').focus();
+    updateFormTotal();
+  }
+
+  document.getElementById('addBtn').addEventListener('click', ()=>{
+    const part = document.getElementById('f_part').value.trim().toUpperCase();
+    if(!part){
+      document.getElementById('f_part').focus();
+      document.getElementById('f_part').style.borderColor = 'var(--red)';
+      setTimeout(()=> document.getElementById('f_part').style.borderColor = '', 900);
+      return;
+    }
+    const newRow = {
+      id: Date.now(),
+      data: isoToBR(document.getElementById('f_data').value),
+      part,
+      tipo: selectedStatus,
+      finalizado: false,
+      onhand: numOrNull(document.getElementById('f_onhand').value),
+      linha: numOrNull(document.getElementById('f_linha').value),
+      hora: document.getElementById('f_hora').value || null,
+      serial: numOrNull(document.getElementById('f_serial').value),
+      estoque: numOrNull(document.getElementById('f_estoque').value),
+      receb: numOrNull(document.getElementById('f_receb').value),
+      pcs: numOrNull(document.getElementById('f_pcs').value),
+      picking: numOrNull(document.getElementById('f_picking').value),
+      endEstoque: document.getElementById('f_endEstoque').value.trim().toUpperCase() || null,
+      end: document.getElementById('f_end').value.trim().toUpperCase() || null,
+      comentario: document.getElementById('f_comment').value.trim() || null,
+    };
+    rows.unshift(newRow);
+    saveRows();
+    render();
+    clearForm();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', clearForm);
+
+  document.getElementById('f_part').addEventListener('keydown', e=>{
+    if(e.key === 'Enter') document.getElementById('addBtn').click();
+  });
+
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentFilter = chip.dataset.filter;
+      render();
+    });
+  });
+
+  document.getElementById('searchInput').addEventListener('input', e => {
+    searchTerm = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    if(confirm('Apagar todos os lançamentos salvos? Essa ação não pode ser desfeita.')){
+      rows = [];
+      saveRows();
+      render();
+    }
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const headers = ['Data','PartNumber','ON-HAND','Qtd na Linha','Hora','Serial','Qtd no Estoque','Qtd no Recebimento','Total','PCS','Picking','Status','Finalizado','Endereco de Estoque','Endereco de Linha','Comentario'];
+    const lines = [headers.join(';')];
+    rows.forEach(r=>{
+      lines.push([
+        r.data, r.part, r.onhand ?? '', r.linha ?? '', r.hora ?? '', r.serial ?? '',
+        r.estoque ?? '', r.receb ?? '', computeTotal(r) ?? '', r.pcs ?? '', r.picking ?? '',
+        r.tipo === 'red' ? 'HOT' : r.tipo === 'green' ? 'EM LINHA' : 'SPOT',
+        r.finalizado ? 'SIM' : 'NAO',
+        r.endEstoque ?? '', r.end ?? '', (r.comentario ?? '').replace(/;/g, ',')
+      ].join(';'));
+    });
+    const blob = new Blob(["\uFEFF" + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `contagem_estoque_${todayStr().replace(/\//g,'-')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  render();
+</script>
+
+</body>
+</html>
